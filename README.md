@@ -48,7 +48,7 @@ export TAVILY_API_KEY="your_tavily_api_key"
 export AWS_ACCESS_KEY_ID="your_aws_access_key"
 export AWS_SECRET_ACCESS_KEY="your_aws_secret_access_key"
 export AWS_DEFAULT_REGION="your_aws_region"
-
+```
 
 ## Setting Up Your Development Environment
 For an efficient development experience, please follow these two essential steps:
