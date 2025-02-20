@@ -50,8 +50,9 @@ This is the backend script that contains the logic for generating answers. It pr
 3. **CIK Extraction**: If necessary, the system extracts the **CIK (Central Index Key)** associated with the company mentioned in the question.
 4. **SEC Filing Data**: The system retrieves relevant **SEC filings** based on the CIK and question tags.
 5. **Web Search**: If the SEC data is insufficient, a **web search** is performed to gather additional context.
-6. **Answer Generation**: A final answer is generated using either SEC data, web results, or both.
-7. **Follow-up Questions**: After generating the answer, the system suggests three follow-up questions for further exploration.
+6. **Generating answers**: Web data based answer and SEC Filing Data beased answers are generated.
+7. **Answer Generation**: A final answer is generated using answers generated in step 6, by combining them and comparing them to each other.
+8. **Follow-up Questions**: After generating the answer, the system suggests three follow-up questions for further exploration.
 
 ## Requirements
 
@@ -81,8 +82,11 @@ The workflow is designed using a **StateGraph** where each step is represented a
 4. **Generate SEC Filing Data**
 5. **Get Web Data**
 6. **Generate Web Answer**
-7. **Final Answer Generation**
-8. **Follow-up Question Suggestion**
+7. **Generate SEC Data embeddings based Answer**
+8. **Final Answer Generation**
+9. **Follow-up Question Suggestion**
+
+![Workflow](Workflow.png)
 
 The workflow is flexible and can be expanded or modified to include additional data sources or processing steps.
 
