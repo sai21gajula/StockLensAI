@@ -1,5 +1,8 @@
 # Stock Price Prediction using LSTM
 
+## Purpose
+The purpose of this project is to develop a predictive model that can forecast stock prices for the **S&P 500 index on a minute-by-minute basis**. The model is intended to assist traders, analysts, and financial institutions in making informed decisions by identifying short-term trends in stock price movements. By leveraging deep learning, this project aims to improve the accuracy of high-frequency trading strategies and provide better insights into market behavior.
+
 ## Introduction
 This project aims to predict stock prices using a Long Short-Term Memory (LSTM) neural network. The dataset consists of historical stock prices, including Open, High, Low, Close, and Volume data, specifically for the **S&P 500 index on a minute-by-minute basis**. The goal is to train an LSTM model that can accurately forecast future stock prices based on past trends.
 
