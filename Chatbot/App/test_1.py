@@ -1,61 +1,26 @@
 import os
 import ast
+import json
+import time
 import boto3
 import operator
-import re
-from langchain_chroma import Chroma
-from langchain_aws import BedrockEmbeddings
-from langchain.docstore.document import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-
-
-import pandas as pd
-from operator import add
 from typing import Literal
 from typing import Annotated
-from pydantic import BaseModel
-from dotenv import load_dotenv
-from langchain.schema import Document
-from typing_extensions import TypedDict
-from google.oauth2 import service_account
-from langchain_community.vectorstores import FAISS
-from langgraph.graph import END, StateGraph, START
-from langgraph.checkpoint.memory import MemorySaver
-from langchain_core.prompts import ChatPromptTemplate
-from langchain.document_loaders import DataFrameLoader
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.vectorstores.base import VectorStoreRetriever
-
-
 from pinecone import Pinecone
-from pinecone.grpc import PineconeGRPC as Pinecone
-from pinecone import ServerlessSpec
-from pinecone import Pinecone
-import itertools
-from typing import Annotated, TypedDict, List, Set
-
-
-from langchain_aws import BedrockLLM, ChatBedrockConverse
-from langchain_core.prompts import ChatPromptTemplate
-from langgraph.graph import StateGraph, START, END
-
 from tavily import TavilyClient
+from typing_extensions import TypedDict
+from typing import Annotated, TypedDict
+from langgraph.graph import StateGraph, END
+from langchain_aws import BedrockEmbeddings
+from langchain_aws import ChatBedrockConverse
+from pinecone.grpc import PineconeGRPC as Pinecone
 
-import boto3
-import numpy as np
-from langchain.embeddings import BedrockEmbeddings
-from sklearn.metrics.pairwise import cosine_similarity
-from langchain.docstore.document import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-
-import json
-import groq
-
-os.environ['TAVILY_API_KEY'] = "YOUR-API_KEY"
-os.environ['GROQ_API_KEY'] = "YOUR-API_KEY"
-os.environ['AWS_ACCESS_KEY_ID'] = "YOUR-API_KEY"
-os.environ['AWS_SECRET_ACCESS_KEY'] = "YOUR-API_KEY"
+os.environ['TAVILY_API_KEY'] = "api-key-here"
+os.environ['AWS_ACCESS_KEY_ID'] = "api-key-here"
+os.environ['AWS_SECRET_ACCESS_KEY'] = "api-key-here"
 os.environ['AWS_DEFAULT_REGION'] = 'us-west-2'
+os.environ['Pinecone_Key'] = 'api-key-here'
+pc = Pinecone(api_key=os.environ['Pinecone_Key'])
 
 bedrock_client = boto3.client(
     service_name='bedrock-runtime',
@@ -69,10 +34,33 @@ bedrock_embeddings = BedrockEmbeddings(
 bedrock_llama = ChatBedrockConverse(
     client=bedrock_client,
     region_name='us-west-2',
-    model_id='meta.llama3-1-70b-instruct-v1:0'
+    model_id='us.meta.llama3-3-70b-instruct-v1:0',
+    temperature=0.3,
+    top_p=0.8,
+    max_tokens=40
 )
 
+bedrock_llama_instruct = ChatBedrockConverse(
+    client=bedrock_client,
+    region_name='us-west-2',
+    model_id='us.meta.llama3-2-11b-instruct-v1:0',
+    temperature=0.3,
+    top_p=0.8,
+)
+bedrock_llama_instruct_limit = ChatBedrockConverse(
+    client=bedrock_client,
+    region_name='us-west-2',
+    model_id='us.meta.llama3-2-11b-instruct-v1:0',
+    temperature=0.3,
+    top_p=0.8,
+    max_tokens=100
+)
+
+index = pc.Index('research')
+tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+
 def generate_embeddings(body):
+    start_time = time.time()
     model_id = model_id='amazon.titan-embed-text-v2:0'
     accept = "application/json"
     content_type = "application/json"
@@ -80,31 +68,26 @@ def generate_embeddings(body):
         body=body, modelId=model_id, accept=accept, contentType=content_type
     )
     response_body = json.loads(response.get('body').read())
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print("For functions: generate_embeddings",elapsed_time)
     return response_body
-
-groq_client = groq.Client(api_key=os.environ["GROQ_API_KEY"])
-def groq_llama_3_3_70b_versatile(prompt: str) -> str:
-    response = groq_client.chat.completions.create(
-        model="llama-3.3-70b-versatile",  # Ensure correct model name
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    return response.choices[0].message.content.strip()
 
 class MultiAgentState(TypedDict):
     question: str
-    answer: str
-    documents: Annotated[list[str], add]
-    web_results: Annotated[list[str], add]
-    web_ans: str
-    SEC_ans:str
+    original_q:str
     CIK_value: str
-    SEC_filing_tags: Annotated[list[str], add]
-    followup_questions: Annotated[list[str], add]
+    SEC_filing_tags: Annotated[list, operator.add]
+    documents: str
+    web_results: str
+    links: Annotated[list, operator.add]
+    answer: str
     halt_execution: bool
-    halt_SEC:bool
+    halt_SEC: bool
+    n3s_question: str
 
 def rewrite_q(state: MultiAgentState) -> MultiAgentState:
+    start_time = time.time()
     SYS_PROMPT = """
     You are a great rewriter. When given a user’s question related to the finance or stock market field, rewrite the question in more detail, ensuring it remains a single, cohesive question while covering the essence of the original query. If the user's question is not related to finance or the stock market, return -1.
     Field of Topic: "Finance/Stock Market"
@@ -148,12 +131,17 @@ def rewrite_q(state: MultiAgentState) -> MultiAgentState:
 
 
     rewritten_question_content = str(rewritten_question.content.strip())
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print("For functions: rewrite_q",elapsed_time)
+
     if rewritten_question_content != str(-1):
         return {"question": rewritten_question_content, "halt_execution": False}
     else:
         return {"answer": "Please ask a valid question", "halt_execution": True}
 
-def get_CIK(state: MultiAgentState) -> MultiAgentState:
+def get_CIK(state: MultiAgentState) -> dict:
+    start_time = time.time()
     SYS_PROMPT = """
 Find the 10-digit CIK for the company mentioned in the given question. Retain leading zeros and return only the CIK value. If the CIK is not found, return -1.
 
@@ -169,75 +157,16 @@ Return only the CIK value or -1. Do not include any additional text.
     rewritten_question = llm.invoke(prompt)
 
     rewritten_question_content = str(rewritten_question.content.strip())
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print("For functions: get_CIK",elapsed_time)
     if rewritten_question_content != str(-1):
         return {"CIK_value": rewritten_question_content,"halt_SEC":False}
     else:
         return {"halt_SEC": True}
 
-tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
-
-def web_search(state: MultiAgentState) -> MultiAgentState:
-    query = state["question"]
-    results = tavily_client.search(query=query, search_depth="basic")
-    top_results = [r["content"] for r in results["results"][:10]]
-    return {"web_results": top_results}
-
-def web_gen_ans(state: MultiAgentState) -> MultiAgentState:
-    question = state["question"]
-    body = json.dumps({
-        "inputText": question,
-        "embeddingTypes": ["binary"]
-    })
-    question_embedding = np.array(generate_embeddings(body)["embeddingsByType"]["binary"])
-
-
-    web_results = state["web_results"]
-    combined_web_results =  " ".join(web_results)
-
-    docs = [Document(page_content=combined_web_results)]
-    splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=300)
-    chunked_docs = splitter.split_documents(docs)
-
-
-    embeddings = []
-    for doc in chunked_docs:
-        body = json.dumps({
-        "inputText": doc.page_content,
-        "embeddingTypes": ["binary"]
-    })
-        embeddings.append(generate_embeddings(body)["embeddingsByType"]["binary"])
-
-    embeddings = np.array(embeddings)
-    cosine_similarities = cosine_similarity([question_embedding], embeddings)
-
-    top_3_indices = np.argsort(cosine_similarities[0])[::-1][:3]
-    top_3_docs = [chunked_docs[i].page_content for i in top_3_indices]
-    context = "\n".join([doc for doc in top_3_docs])
-
-    SYS_PROMPT = """
-You are an advanced language model trained to generate answers based strictly on the provided context.
-If the context contains the answer to the question, respond accordingly.
-
-Context:
-{context}
-
-Question: {question}
-Answer:
-
-Display only new answer generated, do not give additional information.
-    """
-
-
-
-    prompt = SYS_PROMPT.replace("{context}", context).replace("{question}", question)
-    final_ans = groq_llama_3_3_70b_versatile(prompt)
-
-    if final_ans != str(-1):
-        return {"web_ans":final_ans}
-    else:
-        return {"web_ans":"-1"}
-
 def get_SEC_filings_tags(state: MultiAgentState) -> MultiAgentState:
+    start_time = time.time()
     question = state["question"]
 
     SYS_PROMPT = SYS_PROMPT = """
@@ -261,97 +190,99 @@ def get_SEC_filings_tags(state: MultiAgentState) -> MultiAgentState:
     llm = bedrock_llama
     rewritten_question = llm.invoke(prompt)
     rewritten_question_content = ast.literal_eval(str(rewritten_question.content.strip()))
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print("For functions: get_SEC_filings_tags",elapsed_time)
 
     return {"SEC_filing_tags":rewritten_question_content}
 
-def get_SEC_filings_data(state: MultiAgentState) -> MultiAgentState:
-    question = state["question"]
-    tags = state["SEC_filing_tags"]
-    CIK_value = state["CIK_value"]
+def retrieve_documents(state: MultiAgentState) -> dict:
+    """Fetches relevant documents from DB based on user query."""
+    start_time = time.time()
+    query = state["question"]
 
-    tempdocs = []
-    for i in range(len(tags)):
-        combined_string = re.sub(r'[^a-zA-Z0-9_-]', '_', f"{CIK_value}_{i}")
-        combined_string = re.sub(r'_{2,}', '_', combined_string)
-        chroma_db = Chroma(persist_directory="./SEC_DATA", collection_name=combined_string, embedding_function=bedrock_embeddings)
-        similarity_threshold_retriever = chroma_db.as_retriever( search_type="similarity_score_threshold", search_kwargs={"k": 2,"score_threshold": 0.2} )
-        top_docs = similarity_threshold_retriever.invoke(question)
-        if top_docs:
-            for doc in top_docs:
-                tempdocs.append(doc.page_content)
-    if tempdocs:
-        return {"documents":tempdocs}
+    body = json.dumps({
+        "inputText": query,
+        "embeddingTypes": ["binary"]
+    })
+
+    vector = generate_embeddings(body)
+
+    a = index.query(
+    vector=vector["embeddingsByType"]["binary"],
+    top_k=5,
+    include_values=False,
+    include_metadata=True
+)
+    combined_text = '\n'.join([a.matches[i]['metadata']['text'] for i in range(len(a.matches))])
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print("For functions: retrieve_documents",elapsed_time)
+
+    if combined_text:
+        return {"documents": combined_text}
     else:
         return {"halt_SEC":True}
 
-def SEC_gen_ans(state: MultiAgentState) -> MultiAgentState:
-    question = state["question"]
-    docks  = state["documents"]
+def web_search(state: MultiAgentState) -> dict:
+    start_time = time.time()
+    query = state["question"]
+    search_results = tavily_client.search(query=query, num_results=3, search_depth="advanced")
+    filtered_results = [doc for doc in search_results['results'] if (doc.get('score', 0)) > 0.2]
+    result_lines = []
+    links = []
+    for doc in filtered_results:
+        title = doc.get('title', 'No Title')
+        url = doc.get('url', '')
+        content = doc.get('content', 'No Title')
+        result_lines.append(f"{title} - {content}")
+        links.append(url)
+    results = "\n".join(result_lines)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print("For functions: web_search",elapsed_time)
 
-    context = "\n".join([doc for doc in docks])
+    return {'web_results': results, 'links':links}
 
-    SYS_PROMPT = """
-You are an advanced language model trained to generate answers based strictly on the provided context.
-If the context contains the answer to the question, respond accordingly and return -1.
-
-Context:
-{context}
-
-Question: {question}
-Answer:
-
-Display only new answer generated, do not give additional information.
-    """
-
-
-
-    prompt = SYS_PROMPT.replace("{context}", context).replace("{question}", question)
-    llm = groq_llama_3_3_70b_versatile
-    final_ans = groq_llama_3_3_70b_versatile(prompt)
-
-    if final_ans != str(-1):
-        print()
-        return {"SEC_ans":final_ans}
-    else:
-        return {"SEC_ans":str("-1")}
-
-def final_gen_ans(state: MultiAgentState) -> MultiAgentState:
-    question = state["question"]
-    SEC_ans = state.get("SEC_ans", "")
-    web_ans  = state["web_ans"]
-
-    if  SEC_ans:
-        context = "Answer generated from SEC data is: " + SEC_ans + "\n" + "Web generated answer is: "+ web_ans
-    else:
-        context = "Web generated answer is: "+ web_ans
+def final_gen_ans(state: MultiAgentState):
+    start_time = time.time()
+    if not state["halt_execution"]:
+        question = state["question"]
+        if not state["halt_SEC"]:
+            web_context = state["web_results"]
 
 
 
-    SYS_PROMPT = """
-You are an advanced language model trained to generate answers based strictly on the provided context.
+
+            SYS_PROMPT = """
+        You will receive one of two types of input:
+
+        Context generated from web search: This was created by processing data scraped from the web.
+        Context generated from our personal database: This was created by retrieving relevant documents stored in our personal database.
+        When answering, prioritize the Context generated from our personal database, ensuring it's fully detailed and accurate. If that answer lacks sufficient detail or is vague, supplement it with the Context generated from web search.
 
 
-Context:
-{context}
+            question: {question}
+            web_context: {web_context}
+            personal_database_context: []
 
-Question: {question}
-Answer:
+            Answer: [Answer based on the RAG-generated response, supplemented with the web context if needed.]
+            Only show the final answer generated, nothing else! (Do not tell the source of data, just return answer), also keep the answer under 45 words!
+                """
+            prompt = SYS_PROMPT.replace("{question}", question).replace("{web_context}", web_context)
+            llm = bedrock_llama_instruct_limit
+            answer_3 = llm.invoke(prompt)
+            final_ans = answer_3.content.strip()
 
-Display only new answer generated, do not give additional information.
-    """
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            print("For functions: final_gen_ans",elapsed_time)
+            return {'answer':final_ans}
+        else:
+            return {'answer':"No answer found in prestored data."}
 
-
-
-    prompt = SYS_PROMPT.replace("{context}", context).replace("{question}", question)
-    llm = groq_llama_3_3_70b_versatile
-    final_ans = groq_llama_3_3_70b_versatile(prompt)
-
-    if final_ans != str(-1):
-        return {"answer":final_ans}
-    else:
-        return {"answer":"No answer found! Please try with a different question."}
-
-def suggested_Questions(state: MultiAgentState) -> MultiAgentState:
+def suggested_Questions(state: MultiAgentState) -> dict:
+    start_time = time.time()
     question = state["question"]
     answer = state.get("answer", "")
 
@@ -364,64 +295,42 @@ answer: {answer}
 field: Finance/ Stock market
 
 
-Suggested Questions:
-all Suggested Questions should be in new line. Only give questions, nothing else! Only make 3 new Questions!
+Suggested Questions: Keep one question per line, keep question on point, and simple and small.
+all Suggested Questions should be in new line. Only give questions, nothing else! Only make 3 new Questions! Each question should be of max 14 words.
     """
 
 
 
     prompt = SYS_PROMPT.replace("{question}", question).replace("{answer}", answer)
-    llm = groq_llama_3_3_70b_versatile
-    final_ans = groq_llama_3_3_70b_versatile(prompt)
-    final_ans = final_ans.split("\n")
+    llm = bedrock_llama_instruct_limit
+    answer_3 = llm.invoke(prompt)
+    final_ans = answer_3.content.strip()
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print("For functions: suggested_Questions",elapsed_time)
+    return {"n3s_question":str(final_ans)}
 
-    return {"followup_questions":final_ans}
+def route_query(state: MultiAgentState) -> Literal["get_CIK", "web_search", "final_gen_ans"]:
+    """Routes query to both retrieval and web search, or to final answer if halt_execution is True."""
+    if state["halt_execution"]:
+        return "final_gen_ans"
+    else:
+        return "get_CIK", "web_search"
 
 workflow = StateGraph(MultiAgentState)
-workflow.add_node("Rewrite_Question", rewrite_q)
-
-workflow.add_node("Get_CIK_Value", get_CIK)
-workflow.add_node("Gen_SEC_filing_Tags", get_SEC_filings_tags)
-workflow.add_node("Gen_SEC_filing_Data", get_SEC_filings_data)
-workflow.add_node("Gen_SEC_ANS", SEC_gen_ans)
-
-
-
-workflow.add_node("Get_web_Data", web_search)
-workflow.add_node("Gen_Web_ANS", web_gen_ans)
-workflow.add_node("Final_ANS", final_gen_ans)
+workflow.add_node("rewrite_q", rewrite_q)
+workflow.add_node("get_CIK", get_CIK)
+workflow.add_node("get_SEC_filings_tags", get_SEC_filings_tags)
+workflow.add_node("retrieve_documents", retrieve_documents)
+workflow.add_node("web_search", web_search)
+workflow.add_node("final_gen_ans", final_gen_ans)
 workflow.add_node("Follow_up_Questions", suggested_Questions)
-
-
-
-
-
-
-workflow.set_entry_point("Rewrite_Question")
-workflow.add_edge("Rewrite_Question", "Get_CIK_Value")
-workflow.add_edge("Get_CIK_Value", "Gen_SEC_filing_Tags")
-workflow.add_edge("Gen_SEC_filing_Tags", "Gen_SEC_filing_Data")
-workflow.add_edge("Rewrite_Question", "Get_web_Data")
-workflow.add_edge("Gen_SEC_filing_Data", "Gen_SEC_ANS")
-workflow.add_edge("Gen_SEC_ANS", "Final_ANS")
-workflow.add_edge("Get_web_Data", "Gen_Web_ANS")
-workflow.add_edge("Gen_Web_ANS", "Final_ANS")
-
-workflow.add_edge("Final_ANS", "Follow_up_Questions")
+intermediates = ["get_CIK", "web_search", "final_gen_ans"]
+workflow.set_entry_point("rewrite_q")
+workflow.add_conditional_edges("rewrite_q",route_query,intermediates)
+workflow.add_edge("get_CIK", "get_SEC_filings_tags")
+workflow.add_edge("get_SEC_filings_tags", "retrieve_documents")
+workflow.add_edge(["retrieve_documents","web_search"], "final_gen_ans")
+workflow.add_edge("final_gen_ans", "Follow_up_Questions")
 workflow.add_edge("Follow_up_Questions", END)
-
 graph = workflow.compile()
-
-# from IPython.display import Image, display
-# display(Image(graph.get_graph().draw_mermaid_png()))
-
-# output = graph.invoke({
-#     "question": "Apple filing say about Earnings Per Share?",
-# })
-
-# output
-
-# output["answer"]
-
-# output["followup_questions"]
-
