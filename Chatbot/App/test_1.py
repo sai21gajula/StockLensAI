@@ -34,7 +34,7 @@ bedrock_embeddings = BedrockEmbeddings(
 bedrock_llama = ChatBedrockConverse(
     client=bedrock_client,
     region_name='us-west-2',
-    model_id='us.meta.llama3-3-70b-instruct-v1:0',
+    model_id='model-access-codename-here',
     temperature=0.3,
     top_p=0.8,
     max_tokens=40
@@ -43,14 +43,14 @@ bedrock_llama = ChatBedrockConverse(
 bedrock_llama_instruct = ChatBedrockConverse(
     client=bedrock_client,
     region_name='us-west-2',
-    model_id='us.meta.llama3-2-11b-instruct-v1:0',
+    model_id='model-access-codename-here',
     temperature=0.3,
     top_p=0.8,
 )
 bedrock_llama_instruct_limit = ChatBedrockConverse(
     client=bedrock_client,
     region_name='us-west-2',
-    model_id='us.meta.llama3-2-11b-instruct-v1:0',
+    model_id='umodel-access-codename-here',
     temperature=0.3,
     top_p=0.8,
     max_tokens=100
@@ -61,7 +61,7 @@ tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
 
 def generate_embeddings(body):
     start_time = time.time()
-    model_id = model_id='amazon.titan-embed-text-v2:0'
+    model_id='model-access-codename-here'
     accept = "application/json"
     content_type = "application/json"
     response = bedrock_client.invoke_model(
