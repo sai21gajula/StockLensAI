@@ -86,7 +86,7 @@ The workflow is designed using a **StateGraph** where each step is represented a
 8. **Final Answer Generation**
 9. **Follow-up Question Suggestion**
 
-![Workflow](Workflow.png)
+![Workflow](flow.png)
 
 The workflow is flexible and can be expanded or modified to include additional data sources or processing steps.
 
