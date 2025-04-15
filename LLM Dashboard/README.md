@@ -64,10 +64,6 @@ stockai/
 │   └── [STOCK_SYMBOL]/     # Stock-specific results
 ├── models/                 # (Optional) ML prediction models
 │   └── lstm_predictor.py   # (If implemented) LSTM prediction
-├── utils/                  # Utility functions
-│   └── data_utils.py       # Data processing utilities
-├── static/                 # Static assets for dashboard
-│   └── styles.css          # CSS styles for Streamlit
 ├── .env                    # Environment variables
 ├── requirements.txt        # Dependencies
 └── README.md               # Documentation
