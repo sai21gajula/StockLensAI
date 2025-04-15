@@ -68,10 +68,13 @@ Set up environment variables:
     - `GROQ_API_KEY`
     - AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
 
-Run the Streamlit app:
+Run the app using :
+
     ```bash
+    uvicorn api:app --host 0.0.0.0 --port 8000 --reload 
     streamlit run app.py
     ```
+The first command starts the API, and the second command starts the frontend, which was created using Streamlit.
 
 ### Workflow Graph:
 
