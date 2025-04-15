@@ -1,0 +1,15 @@
+artifact_uri: /content/drive/MyDrive/data_capstone/LSTM_ARO_MODEL/mlruns/855253293886414914/058a0ea041d9434d8199db7ade599be7/artifacts
+end_time: 1744182308479
+entry_point_name: ''
+experiment_id: '855253293886414914'
+lifecycle_stage: active
+run_id: 058a0ea041d9434d8199db7ade599be7
+run_name: Dual_Output_LSTM_ARO_Enhanced_GPU
+run_uuid: 058a0ea041d9434d8199db7ade599be7
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1744182141468
+status: 4
+tags: []
+user_id: root

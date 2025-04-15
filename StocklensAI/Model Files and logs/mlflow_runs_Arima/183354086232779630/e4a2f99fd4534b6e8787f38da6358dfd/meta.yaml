@@ -1,0 +1,15 @@
+artifact_uri: file:///content/drive/MyDrive/mlflow_runs/183354086232779630/e4a2f99fd4534b6e8787f38da6358dfd/artifacts
+end_time: 1744065345337
+entry_point_name: ''
+experiment_id: '183354086232779630'
+lifecycle_stage: active
+run_id: e4a2f99fd4534b6e8787f38da6358dfd
+run_name: ARIMA_4_2_0
+run_uuid: e4a2f99fd4534b6e8787f38da6358dfd
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1744065302408
+status: 3
+tags: []
+user_id: root
