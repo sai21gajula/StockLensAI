@@ -15,10 +15,6 @@ import json
 
 # Environment Variables
 load_dotenv()
-st.secrets["SERPER_API_KEY"]
-
-
-import streamlit as st
 
 
 os.environ["SERPER_API_KEY"] = os.getenv("SERPER_API_KEY")
