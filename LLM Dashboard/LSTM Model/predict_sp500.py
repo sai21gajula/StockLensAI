@@ -13,95 +13,108 @@ from datetime import datetime, timedelta
 from add_technical_indicators import add_technical_indicators
 from prepare_data import prepare_data_for_prediction, get_latest_technical_indicators
 
-
+# Get the directory where the current script is located
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(SCRIPT_DIR, 'models')
+RESULTS_DIR = os.path.join(SCRIPT_DIR, 'results')
+DATA_DIR = os.path.join(SCRIPT_DIR, 'data')
 
 warnings.filterwarnings('ignore')  # Suppress warnings
 
-# Create directories if they don't exist
-os.makedirs('models', exist_ok=True)
-os.makedirs('results', exist_ok=True)
-os.makedirs('data', exist_ok=True)
+# Create directories if they don't exist using absolute paths
+os.makedirs(MODELS_DIR, exist_ok=True)
+os.makedirs(RESULTS_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
 
 def safe_load_model(model_path):
     """
     Safely load a model with proper error handling.
     Returns None if model cannot be loaded.
     """
+    # Ensure model_path is absolute
+    abs_model_path = os.path.join(MODELS_DIR, os.path.basename(model_path))
     try:
-        print(f"Attempting to load model from {model_path}...")
-        model = load_model(model_path)
-        print(f"Successfully loaded model from {model_path}")
+        print(f"Attempting to load model from {abs_model_path}...")
+        model = load_model(abs_model_path)
+        print(f"Successfully loaded model from {abs_model_path}")
         return model
     except Exception as e:
-        print(f"Failed to load model from {model_path}: {str(e)}")
+        print(f"Failed to load model from {abs_model_path}: {str(e)}")
         return None
 
 def load_saved_models():
     """Load the pre-trained models and scalers"""
     try:
         print("Loading saved models and scalers...")
-        
-        # Try different model file names
+
+        # Use absolute paths based on SCRIPT_DIR
         potential_direction_models = [
-            'models/final_direction_model.h5',  # Use .h5 format for better compatibility
-            'models/best_direction_model.h5',
-            'models/direction_model.h5',
-            'models/final_direction_model.keras',
-            'models/best_direction_model.keras'
+            os.path.join(MODELS_DIR, 'final_direction_model.h5'),
+            os.path.join(MODELS_DIR, 'best_direction_model.h5'),
+            os.path.join(MODELS_DIR, 'direction_model.h5'),
+            os.path.join(MODELS_DIR, 'final_direction_model.keras'),
+            os.path.join(MODELS_DIR, 'best_direction_model.keras')
         ]
-        
+
         potential_price_models = [
-            'models/final_price_model.h5',  # Use .h5 format for better compatibility
-            'models/best_price_model.h5',
-            'models/price_model.h5',
-            'models/final_price_model.keras',
-            'models/best_price_model.keras'
+            os.path.join(MODELS_DIR, 'final_price_model.h5'),
+            os.path.join(MODELS_DIR, 'best_price_model.h5'),
+            os.path.join(MODELS_DIR, 'price_model.h5'),
+            os.path.join(MODELS_DIR, 'final_price_model.keras'),
+            os.path.join(MODELS_DIR, 'best_price_model.keras')
         ]
-        
+
         # Try to load direction model
         direction_model = None
         for model_path in potential_direction_models:
             if os.path.exists(model_path):
+                # Pass the absolute path directly
                 direction_model = safe_load_model(model_path)
                 if direction_model is not None:
                     break
-        
+
         # Try to load price model
         price_model = None
         for model_path in potential_price_models:
             if os.path.exists(model_path):
+                # Pass the absolute path directly
                 price_model = safe_load_model(model_path)
                 if price_model is not None:
                     break
-        
+
         # If models don't exist, we'll need to create new models
         if direction_model is None or price_model is None:
             print("Models not found or had loading errors. Creating new models...")
-            
-            # Try to load a feature scaler to get the input shape
+
+            # Try to load a feature scaler to get the input shape (use absolute path)
+            feature_scaler_path = os.path.join(MODELS_DIR, 'feature_scaler.pkl')
             feature_scaler = None
             try:
-                feature_scaler = joblib.load('models/feature_scaler.pkl')
+                feature_scaler = joblib.load(feature_scaler_path)
                 # Get feature dimensions if possible
                 if hasattr(feature_scaler, 'n_features_in_'):
                     n_features = feature_scaler.n_features_in_
                 else:
                     n_features = 50  # Default fallback
             except Exception as e:
-                print(f"Error loading feature scaler: {str(e)}")
+                print(f"Error loading feature scaler from {feature_scaler_path}: {str(e)}")
                 n_features = 50  # Default fallback
-            
+
             # Create simple placeholder models
             sequence_length = 60  # Default sequence length
             input_shape = (sequence_length, n_features)
-            
+
             # Try to use the fixed model builder if available
-            
-           
+
+        # Load scalers using absolute paths
+        feature_scaler_path = os.path.join(MODELS_DIR, 'feature_scaler.pkl')
+        price_scaler_path = os.path.join(MODELS_DIR, 'price_scaler.pkl')
+        transform_params_path = os.path.join(MODELS_DIR, 'transform_params.pkl')
+
         try:
-            feature_scaler = joblib.load('models/feature_scaler.pkl')
-            price_scaler = joblib.load('models/price_scaler.pkl')
-            transform_params = joblib.load('models/transform_params.pkl')
+            feature_scaler = joblib.load(feature_scaler_path)
+            price_scaler = joblib.load(price_scaler_path)
+            transform_params = joblib.load(transform_params_path)
         except Exception as e:
             print(f"Error loading scalers: {str(e)}")
             print("Creating default scalers...")
@@ -109,10 +122,10 @@ def load_saved_models():
             feature_scaler = StandardScaler()
             price_scaler = StandardScaler()
             transform_params = {'log_transform': False}
-        
+
         print("Models and scalers loaded or created successfully")
         return direction_model, price_model, feature_scaler, price_scaler, transform_params
-    
+
     except Exception as e:
         print(f"Error loading models: {str(e)}")
         raise
@@ -182,8 +195,9 @@ def get_sp500_data(use_fallback=False):
             stock_df = stock_df.dropna(subset=['Date'])
             stock_df = stock_df.set_index('Date')
             
-            # Save to CSV for backup
-            stock_df.to_csv('data/latest_sp500.csv')
+            # Save to CSV for backup (use absolute path)
+            latest_csv_path = os.path.join(DATA_DIR, 'latest_sp500.csv')
+            stock_df.to_csv(latest_csv_path)
             
             print("Successfully fetched live S&P 500 data")
             print(f"Data range: {stock_df.index.min().date()} to {stock_df.index.max().date()}")
@@ -194,10 +208,10 @@ def get_sp500_data(use_fallback=False):
             print(f"Error fetching S&P 500 data from Yahoo Finance: {str(e)}")
             print("Falling back to Kaggle dataset...")
     
-    # Next try Kaggle dataset
+    # Next try Kaggle dataset (use absolute path for local check)
     kaggle_paths = [
         '/kaggle/input/testing-the-future-data/sp500_data.csv',  # Kaggle competition path
-        'data/sp500_data.csv'                                    # Local path
+        os.path.join(DATA_DIR, 'sp500_data.csv')                  # Local path using DATA_DIR
     ]
     
     for kaggle_path in kaggle_paths:
@@ -212,8 +226,8 @@ def get_sp500_data(use_fallback=False):
                 print(f"Error reading data from {kaggle_path}: {str(e)}")
                 print("Trying next data source...")
     
-    # Try to use the previously saved latest data if it exists
-    latest_path = 'data/latest_sp500.csv'
+    # Try to use the previously saved latest data if it exists (use absolute path)
+    latest_path = os.path.join(DATA_DIR, 'latest_sp500.csv')
     if os.path.exists(latest_path):
         try:
             print(f"Using previously saved S&P 500 data from {latest_path}")
@@ -225,29 +239,33 @@ def get_sp500_data(use_fallback=False):
             print(f"Error reading previously saved data: {str(e)}")
             print("Falling back to generated data...")
     
-    # Also check for synthetic data that might have been created
-    synthetic_path = 'data/synthetic_sp500_data.csv'
+    # Also check for synthetic data that might have been created (use absolute path)
+    synthetic_path = os.path.join(DATA_DIR, 'synthetic_sp500_data.csv')
     if os.path.exists(synthetic_path):
         try:
             print(f"Using synthetic S&P 500 data from {synthetic_path}")
             stock_df = pd.read_csv(synthetic_path)
-            stock_df['Date'] = pd.to_datetime(stock_df.index)
+            stock_df['Date'] = pd.to_datetime(stock_df.index) # Assuming Date is index in synthetic
             stock_df = stock_df.set_index('Date')
             return stock_df
         except Exception as e:
             print(f"Error reading synthetic data: {str(e)}")
             print("Falling back to generated data...")
     
-    # As a last resort, use the generated fallback data
-    try:
-        print(f"Using fallback S&P 500 data from {fallback_path}")
-        stock_df = pd.read_csv(fallback_path)
-        stock_df['Date'] = pd.to_datetime(stock_df.index)
-        stock_df = stock_df.set_index('Date')
-        return stock_df
-    except Exception as e:
-        print(f"Error reading fallback data: {str(e)}")
-        raise ValueError("Could not obtain S&P 500 data from any source")
+    # As a last resort, use the generated fallback data (use absolute path)
+    fallback_path = os.path.join(DATA_DIR, 'fallback_sp500_data.csv') # Example path
+    if os.path.exists(fallback_path):
+        try:
+            print(f"Using fallback S&P 500 data from {fallback_path}")
+            stock_df = pd.read_csv(fallback_path)
+            stock_df['Date'] = pd.to_datetime(stock_df.index) # Assuming Date is index
+            stock_df = stock_df.set_index('Date')
+            return stock_df
+        except Exception as e:
+            print(f"Error reading fallback data: {str(e)}")
+            raise ValueError("Could not obtain S&P 500 data from any source")
+    else:
+         raise ValueError(f"Fallback data file not found at {fallback_path}")
 
 def prepare_sequence_data(df, feature_scaler, sequence_length=60):
     """
@@ -381,12 +399,12 @@ def create_prediction_visualization(df, current_date, next_day, current_price,
         plt.tight_layout()
         plt.subplots_adjust(bottom=0.15)
         
-        # Save main visualization
-        output_file = f'results/SP500_prediction_{next_day.date().strftime("%Y-%m-%d")}.png'
+        # Save main visualization (use absolute path)
+        output_file = os.path.join(RESULTS_DIR, f'SP500_prediction_{next_day.date().strftime("%Y-%m-%d")}.png')
         plt.savefig(output_file)
         plt.close()
         
-        # Create a secondary plot with RSI if available
+        # Create a secondary plot with RSI if available (use absolute path)
         if 'RSI_14' in recent_data.columns:
             plt.figure(figsize=(12, 4))
             plt.plot(recent_data.index, recent_data['RSI_14'], color='blue', label='RSI')
@@ -403,11 +421,12 @@ def create_prediction_visualization(df, current_date, next_day, current_price,
             plt.xticks(rotation=45)
             plt.tight_layout()
             
-            # Save RSI visualization
-            plt.savefig(f'results/SP500_RSI_{next_day.date().strftime("%Y-%m-%d")}.png')
+            # Save RSI visualization (use absolute path)
+            rsi_output_file = os.path.join(RESULTS_DIR, f'SP500_RSI_{next_day.date().strftime("%Y-%m-%d")}.png')
+            plt.savefig(rsi_output_file)
             plt.close()
         
-        # Create a third plot with MACD if available
+        # Create a third plot with MACD if available (use absolute path)
         if all(col in recent_data.columns for col in ['MACD', 'MACD_Signal', 'MACD_Diff']):
             plt.figure(figsize=(12, 4))
             plt.plot(recent_data.index, recent_data['MACD'], color='blue', label='MACD')
@@ -420,11 +439,12 @@ def create_prediction_visualization(df, current_date, next_day, current_price,
             plt.xticks(rotation=45)
             plt.tight_layout()
             
-            # Save MACD visualization
-            plt.savefig(f'results/SP500_MACD_{next_day.date().strftime("%Y-%m-%d")}.png')
+            # Save MACD visualization (use absolute path)
+            macd_output_file = os.path.join(RESULTS_DIR, f'SP500_MACD_{next_day.date().strftime("%Y-%m-%d")}.png')
+            plt.savefig(macd_output_file)
             plt.close()
         
-        print(f"Visualizations saved to results directory")
+        print(f"Visualizations saved to {RESULTS_DIR}")
         return output_file
     
     except Exception as e:
@@ -614,7 +634,7 @@ def predict_sp500(use_fallback=False):
         if indicators:
             print_technical_analysis(indicators)
         
-        # Save results to JSON
+        # Save results to JSON (use absolute path)
         results = {
             'current_date': str(current_date.date()),
             'prediction_date': str(next_day.date()),
@@ -624,14 +644,15 @@ def predict_sp500(use_fallback=False):
             'price_change_pct': float(price_change_pct),
             'direction': direction_pred,
             'confidence': float(confidence),
-            'visualization': output_file,
+            # Store relative path for visualization for use in Streamlit app
+            'visualization': os.path.relpath(output_file, SCRIPT_DIR) if output_file else None,
         }
         
         # Add technical indicators if available
         if indicators:
             results['technical_indicators'] = indicators
         
-        results_file = f'results/prediction_{next_day.date().strftime("%Y-%m-%d")}.json'
+        results_file = os.path.join(RESULTS_DIR, f'prediction_{next_day.date().strftime("%Y-%m-%d")}.json')
         with open(results_file, 'w') as f:
             json.dump(results, f, indent=4)
         

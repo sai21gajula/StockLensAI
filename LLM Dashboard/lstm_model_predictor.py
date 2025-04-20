@@ -233,7 +233,7 @@ def lstm_model_predictor_section():
                     if 'visualization' in result:
                         vis_path = result['visualization']
                         if os.path.exists(vis_path):
-                            st.image(vis_path, caption="S&P 500 Prediction Visualization", use_column_width=True)
+                            st.image(vis_path, caption="S&P 500 Prediction Visualization", use_container_width=True)
                         else:
                             # Try alternative paths
                             alt_paths = [
@@ -244,7 +244,7 @@ def lstm_model_predictor_section():
                             vis_found = False
                             for alt_path in alt_paths:
                                 if os.path.exists(alt_path):
-                                    st.image(alt_path, caption="S&P 500 Prediction Visualization", use_column_width=True)
+                                    st.image(alt_path, caption="S&P 500 Prediction Visualization", use_container_width=True)
                                     vis_found = True
                                     break
                                     
@@ -459,11 +459,11 @@ def lstm_model_predictor_section():
                                     
                                     with col1:
                                         if rsi_plots:
-                                            st.image(rsi_plots[0], caption="RSI Indicator", use_column_width=True)
+                                            st.image(rsi_plots[0], caption="RSI Indicator", use_container_width=True)
                                     
                                     with col2:
                                         if macd_plots:
-                                            st.image(macd_plots[0], caption="MACD Indicator", use_column_width=True)
+                                            st.image(macd_plots[0], caption="MACD Indicator", use_container_width=True)
                         except:
                             pass  # Silently handle date parsing errors
                     

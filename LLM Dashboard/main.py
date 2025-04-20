@@ -506,7 +506,7 @@ def main():
     
     # Navigation with improved styling
     st.sidebar.markdown("<h2 style='color: white; margin-top: 2rem;'>Navigation</h2>", unsafe_allow_html=True)
-    options = st.sidebar.radio("", ["Stock Analysis", "LSTM Model Predictor", "StockLensAI"], key="main_navigation")
+    options = st.sidebar.radio("App Navigation", ["Stock Analysis", "LSTM Model Predictor", "StockLensAI"], key="main_navigation", label_visibility="collapsed")
 
     # Main Content Area
     if options == "Stock Analysis":

@@ -32,6 +32,7 @@ __pycache__/
 *.cert
 secrets.json
 config.json
+secrets.toml
 
 # Logs and Databases
 *.log

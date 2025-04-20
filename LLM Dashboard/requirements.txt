@@ -1,11 +1,11 @@
+streamlit
 crewai
 crewai-tools
 yfinance
-streamlit
 pandas
 plotly
 scipy
-numpy
+numpy<2.0 # Constrained numpy version
 textblob
 pandas-ta
 praw 
@@ -20,3 +20,11 @@ fake-useragent
 alpha_vantage
 pydantic
 boto3
+keras
+scikit-learn
+matplotlib
+seaborn
+optuna
+joblib
+ta
+tensorflow
