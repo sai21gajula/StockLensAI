@@ -1,5 +1,5 @@
 streamlit
-crewai==0.112.0
+crewai
 crewai-tools
 yfinance
 pandas
