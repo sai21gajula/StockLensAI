@@ -20,29 +20,19 @@ st.secrets["SERPER_API_KEY"]
 
 import streamlit as st
 
-os.environ["SERPER_API_KEY"] = st.secrets["SERPER_API_KEY"]
-os.environ["REDDIT_CLIENT_ID"] = st.secrets["REDDIT_CLIENT_ID"]
-os.environ["REDDIT_CLIENT_SECRET"] = st.secrets["REDDIT_CLIENT_SECRET"]
-os.environ["REDDIT_USER_AGENT"] = st.secrets["REDDIT_USER_AGENT"]
-os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
-os.environ["ALPHA_VANTAGE_API_KEY"] = st.secrets["ALPHA_VANTAGE_API_KEY"]
 
-gemini_api_key = st.secrets["GEMINI_API_KEY"]
-alpha_vantage_api_key = st.secrets["ALPHA_VANTAGE_API_KEY"]
-groq_account1 = st.secrets["GROQ_API_KEY_1"]
+os.environ["SERPER_API_KEY"] = os.getenv("SERPER_API_KEY")
+os.environ["REDDIT_CLIENT_ID"] = os.getenv("REDDIT_CLIENT_ID")
+os.environ["REDDIT_CLIENT_SECRET"] = os.getenv("REDDIT_CLIENT_SECRET")
+os.environ["REDDIT_USER_AGENT"] = os.getenv("REDDIT_USER_AGENT")
+os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY")
+os.environ["ALPHA_VANTAGE_API_KEY"] = os.getenv("ALPHA_VANTAGE_API_KEY")
+gemini_api_key = os.getenv("GEMINI_API_KEY")
+alpha_vantage_api_key = os.getenv("ALPHA_VANTAGE_API_KEY")
 
-# os.environ["SERPER_API_KEY"] = os.getenv("SERPER_API_KEY")
-# os.environ["REDDIT_CLIENT_ID"] = os.getenv("REDDIT_CLIENT_ID")
-# os.environ["REDDIT_CLIENT_SECRET"] = os.getenv("REDDIT_CLIENT_SECRET")
-# os.environ["REDDIT_USER_AGENT"] = os.getenv("REDDIT_USER_AGENT")
-# os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY")
-# os.environ["ALPHA_VANTAGE_API_KEY"] = os.getenv("ALPHA_VANTAGE_API_KEY")
-# gemini_api_key = os.getenv("GEMINI_API_KEY")
-# alpha_vantage_api_key = os.getenv("ALPHA_VANTAGE_API_KEY")
-
-# # Multiple Groq accounts
-# groq_account1 = os.getenv("GROQ_API_KEY_1", os.getenv("GROQ_API_KEY"))
-# groq_account2 = os.getenv("GROQ_API_KEY_2", groq_account1)
+# Multiple Groq accounts
+groq_account1 = os.getenv("GROQ_API_KEY_1", os.getenv("GROQ_API_KEY"))
+groq_account2 = os.getenv("GROQ_API_KEY_2", groq_account1)
 
 print("API Keys loaded:")
 print(f"Gemini API Key: {gemini_api_key[:5]}..." if gemini_api_key else "Gemini API Key: Not found")
